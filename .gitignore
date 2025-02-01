@@ -1,0 +1,11 @@
+# ignore ALL .log files
+*.log
+
+# ignore ALL image files
+*.png
+*.jpeg
+*.tiff
+
+# ignore ALL model weight files
+*.pt
+*.pth

@@ -6,6 +6,11 @@ I will keep this file updated on how many models implemented so far.
 
 I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat till model is implented -> Test Train`
 
+## Activation Functions:
+
+* [X] Maxout
+* [ ] 
+
 ## Vision Models:
 
 * [ ] [DDPM] - implementation of DDIM and DDPM is the same however only the noising process of the image is different. DDIM is faster.
