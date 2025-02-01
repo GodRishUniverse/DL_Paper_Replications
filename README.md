@@ -16,7 +16,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 ## Text Models and LLMs:
 
 * [X] [Transformer] - training to be implemented
-* [ ] [Moe]
+* [ ] [MoE]
 * [ ] [BERT]
 
 ## Models Trained and Tested So far:
