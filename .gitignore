@@ -9,3 +9,7 @@
 # ignore ALL model weight files
 *.pt
 *.pth
+
+#use / for the directories
+/cGAN/test_data/*
+/cGAN/train_data/*

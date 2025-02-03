@@ -9,12 +9,12 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 ## Activation Functions:
 
 * [X] Maxout
-* [ ] 
+* [ ]
 
 ## Vision Models:
 
 * [ ] [DDPM] - implementation of DDIM and DDPM is the same however only the noising process of the image is different. DDIM is faster.
-* [ ] [cGAN]
+* [X] [cGAN]
 * [ ] ViT (Vision Transfomer)
 * [ ] CLiP
 
@@ -25,6 +25,8 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 * [ ] [BERT]
 
 ## Models Trained and Tested So far:
+
+* [X] cGAN
 
 ## Authors:
 
