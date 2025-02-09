@@ -20,7 +20,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 
 ## Text Models and LLMs:
 
-* [ ] [Transformer] - training to be implemented
+* [X] [Transformer]
 * [ ] [MoE]
 * [ ] [BERT]
 
