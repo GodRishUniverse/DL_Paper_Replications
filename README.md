@@ -9,7 +9,6 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 ## Activation Functions:
 
 * [X] Maxout
-* [ ]
 
 ## Vision Models:
 
@@ -22,6 +21,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 
 * [X] [Transformer]
 * [ ] [MoE]
+* [ ] [xLSTM]
 * [ ] [BERT]
 
 ## Models Trained and Tested So far:
