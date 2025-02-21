@@ -13,6 +13,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 ## Vision Models:
 
 * [ ] [DDPM] - implementation of DDIM and DDPM is the same however only the noising process of the image is different. DDIM is faster.
+  * [ ] Classifier free guidance
 * [X] [cGAN]
 * [ ] CLiP ViT (Vision Transfomer)
 
