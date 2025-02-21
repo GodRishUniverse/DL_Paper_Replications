@@ -14,8 +14,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 
 * [ ] [DDPM] - implementation of DDIM and DDPM is the same however only the noising process of the image is different. DDIM is faster.
 * [X] [cGAN]
-* [ ] ViT (Vision Transfomer)
-* [ ] CLiP
+* [ ] CLiP ViT (Vision Transfomer)
 
 ## Text Models and LLMs:
 
