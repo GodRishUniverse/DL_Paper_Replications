@@ -20,7 +20,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 ## Text Models and LLMs:
 
 * [X] [Transformer]
-* [ ] [MoE]
+* [X] [MoE]
 * [ ] [xLSTM]
 * [ ] [BERT]
 
