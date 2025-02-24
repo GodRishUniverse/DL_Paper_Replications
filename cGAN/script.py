@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dataclasses import dataclass
+from tqdm.auto import tqdm
 
 @dataclass
 class ModelConfig:
@@ -129,7 +130,7 @@ class CGAN(nn.Module):
         self.criterion_disc = nn.BCEWithLogitsLoss() # we use the raw logits
 
     def train(self, accomodate_test : Optional[bool] = False):
-        for epoch in range(self.config.EPOCHS):
+        for epoch in tqdm(range(self.config.EPOCHS)):
             self.generator.train()
             self.discriminator.train()
 
@@ -221,3 +222,9 @@ class CGAN(nn.Module):
             return sample_gen, disc_loss/len(self.test_loader), gen_loss/len(self.test_loader)
 
         return sample_gen, disc_loss/len(test_loader), gen_loss/len(test_loader)
+
+
+if __name__ == "__main__":
+    config = ModelConfig()
+    model = CGAN(config)
+    model.train()
