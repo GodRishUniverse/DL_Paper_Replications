@@ -128,7 +128,7 @@ class CGAN(nn.Module):
         self.criterion_gen = nn.BCEWithLogitsLoss() # we use the raw logits
         self.criterion_disc = nn.BCEWithLogitsLoss() # we use the raw logits
 
-    def train(self):
+    def train(self, accomodate_test : Optional[bool] = False):
         for epoch in range(self.config.EPOCHS):
             self.generator.train()
             self.discriminator.train()
@@ -178,9 +178,13 @@ class CGAN(nn.Module):
             
                 self.scheduler_gen.step()
                 self.scheduler_disc.step()
-                
-            if (epoch+1) % 10 == 0:
-                print(f'Epoch [{epoch+1}/{self.config.EPOCHS}], Generator Loss: {loss_gen.item():.4f}, Discriminator Loss: {loss_disc.item():.4f}')
+            if accomodate_test:
+                sample_gen, disc_loss, gen_loss = self.test()
+                if (epoch+1) % 10 == 0:
+                    print(f"Epoch: [{epoch+1}/{self.config.EPOCHS}], Discriminator loss: {disc_loss}, Generator loss: {gen_loss}") 
+            else:
+                if (epoch+1) % 10 == 0:
+                    print(f'Epoch [{epoch+1}/{self.config.EPOCHS}], Generator Loss: {loss_gen.item():.4f}, Discriminator Loss: {loss_disc.item():.4f}')
 
     def test(self):
         self.generator.eval()
