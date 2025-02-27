@@ -1,15 +1,19 @@
 # Deep Learning Model Paper-Replications
 
+>  📝  **For Educational Purposes only**
+
 In this repository I will be replicating ML/DL/AI Papers and Model Architecture from Scratch using PyTorch.
 
 I will keep this file updated on how many models implemented so far.
 
 I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat till model is implented -> Test Train`
 
+> TODO: I will be creating script files that will be accomodated in a final script so that the models can be accessed from a single file
+
 ## Activation Functions:
 
 * [X] Maxout
-* [ ] RMSNorm
+* [X] RMSNorm - need to be tested
 
 ## Vision Models:
 
