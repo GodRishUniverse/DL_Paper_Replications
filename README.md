@@ -2,7 +2,7 @@
 
 >  📝  **For Educational Purposes only**
 
-In this repository I will be replicating ML/DL/AI Papers and Model Architecture from Scratch using PyTorch.
+In this repository I will be replicating ML/DL/AI Papers and Model Architecture from Scratch using PyTorch (I may use Jax sometimes)
 
 I will keep this file updated on how many models implemented so far.
 
