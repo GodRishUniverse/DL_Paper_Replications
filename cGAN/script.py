@@ -226,5 +226,5 @@ class CGAN(nn.Module):
 
 if __name__ == "__main__":
     config = ModelConfig()
-    model = CGAN(config)
-    model.train()
+    model = CGAN(config, train_loader, test_loader)
+    print(model)

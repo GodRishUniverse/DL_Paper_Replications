@@ -9,6 +9,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 ## Activation Functions:
 
 * [X] Maxout
+* [ ] RMSNorm
 
 ## Vision Models:
 
