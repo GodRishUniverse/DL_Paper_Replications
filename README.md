@@ -1,6 +1,6 @@
 # Deep Learning Model Paper-Replications
 
->  📝  **For Educational Purposes only**
+> 📝  **For Educational Purposes only**
 
 In this repository I will be replicating ML/DL/AI Papers and Model Architecture from Scratch using PyTorch (I may use Jax sometimes)
 
@@ -20,14 +20,17 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 * [ ] [DDPM] - implementation of DDIM and DDPM is the same however only the noising process of the image is different. DDIM is faster.
   * [ ] Classifier free guidance
 * [X] [cGAN]
-* [ ] CLiP ViT (Vision Transfomer)
+* [ ] CLiP ViT  (We will implement the Vision Transformer before this as we will use the same vision transformer for CLiP)
+* [ ] [Vision Transfomer]
 
 ## Text Models and LLMs:
 
 * [X] [Transformer]
 * [X] [MoE]
-* [ ] [xLSTM]
+* [ ] [xLSTM] - paused
 * [ ] [BERT]
+* [ ] [GPT-2]
+* [ ] [Llama2]
 
 ## Models Trained and Tested So far:
 
