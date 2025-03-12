@@ -19,18 +19,24 @@ class ModelConfig:
     num_heads: int = 12
     num_layers: int = 12
     device: str = 'cuda'
+
+    class_dim: int = 768
+    hid_class_dim: int = 3072
     # dropout: float = 0.1 - not used in this implementation
 
 
 class MLP(nn.Module):
-    def __init__(self, config: ModelConfig):
+    def __init__(self, config: ModelConfig, out_dim: Optional[int] = None):
         super().__init__()
+        self.out_dim = config.dim
+        if out_dim is not None:
+            self.out_dim = out_dim
 
         self.layer = nn.Sequential(
             nn.LayerNorm(config.dim, device = config.device),
             nn.Linear(config.dim, config.hidden_dim, device = config.device),
             nn.GELU(),
-            nn.Linear(config.hidden_dim, config.dim, device= config.device),
+            nn.Linear(config.hidden_dim, self.out_dim, device= config.device),
         )
     
     def forward(self, x):
@@ -93,7 +99,7 @@ class ViT(nn.Module):
 
         self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, config.dim))
         self.transformer = Transformer(config=config)
-        self.mlp_head = MLP(dim, dim, num_classes, device) # to fix
+        self.mlp_head = MLP(config=config, out_dim=config.num_classes) # to fix
     
     def forward(self, x):
         b, _, _, _ = x.shape
@@ -113,3 +119,23 @@ class ViT(nn.Module):
 
         logits = z[:, 0, :] # Get the logits for the class token which is the first token
         return z, logits
+
+
+if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    x = torch.randn(1, 3, 224, 224).to(device)
+
+    config = ModelConfig(
+        image_size = 224,
+        num_channels = 3,
+        dim = 768,
+        num_heads = 12,
+        num_layers = 12,
+        hidden_dim = 3072,
+        patch_size = 16,
+        num_classes = 1000,
+        device = device
+    )
+    vit = ViT(config=config)
+    out, logits = vit(x)
+    print(out.shape, logits.shape)
