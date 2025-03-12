@@ -7,6 +7,11 @@ from einops.layers.torch import Rearrange
 
 from dataclasses import dataclass
 
+
+from torchvision import datasets, transforms
+
+from tqdm.auto import tqdm
+
 @dataclass
 class ModelConfig:
     image_size: int = 224
@@ -123,19 +128,62 @@ class ViT(nn.Module):
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    x = torch.randn(1, 3, 224, 224).to(device)
+
+    img_transform = transforms.Compose([
+        transforms.Resize(32),
+        transforms.ToTensor(),
+    ])
+
+    train_dataset = datasets.CIFAR100(root='./ViT/train_vit', train  = True, download=True, transform=img_transform)
+    test_dataset = datasets.CIFAR100(root='./ViT/test_vit', train  = False, download=True, transform=img_transform)
+
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=True)
+    test_dataset = torch.utils.data.DataLoader(test_dataset, batch_size=32, shuffle=True)
 
     config = ModelConfig(
-        image_size = 224,
+        image_size = 32,
         num_channels = 3,
-        dim = 768,
+        dim = 3072,
         num_heads = 12,
         num_layers = 12,
-        hidden_dim = 3072,
-        patch_size = 16,
-        num_classes = 1000,
+        hidden_dim = 768,
+        patch_size = 8,
+        num_classes = 100,
         device = device
     )
     vit = ViT(config=config)
-    out, logits = vit(x)
-    print(out.shape, logits.shape)
+    vit = vit.to(device)
+    print(vit)
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.AdamW(vit.parameters(), lr=0.0001, weight_decay=0.1)
+    num_epochs = 10
+
+    for epoch in tqdm(range(num_epochs)):
+        vit.train()
+        for i, (images, labels) in enumerate(train_loader):
+            images = images.to(device)
+            labels = labels.to(device)
+
+            optimizer.zero_grad()
+            z, logits = vit(images)
+            loss = criterion(logits, labels)
+            loss.backward()
+            optimizer.step()
+    
+            if i % 100 == 0:
+                print(f'Epoch [{epoch+1}/{num_epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item()}')
+
+        with torch.inference_mode():
+            vit.eval()
+            correct = 0
+            total = 0
+            for images, labels in test_dataset:
+                images = images.to(device)
+                labels = labels.to(device)
+                z, logits = vit(images)
+                _, predicted = torch.max(logits.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+
+            print(f'Test Accuracy of the model on the 10000 test images: {100 * correct // total} %')
