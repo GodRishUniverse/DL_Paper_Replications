@@ -1,0 +1,10 @@
+torch
+einops
+tqdm
+wandb
+numpy
+pandas
+matplotlib
+scikit-learn
+scipy
+jax
