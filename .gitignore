@@ -11,5 +11,7 @@
 *.pth
 
 #use / for the directories
-/cGAN/test_data/*
-/cGAN/train_data/*
+/paperreplications/cGAN/test_data/*
+/paperreplications/cGAN/train_data/*
+/paperreplications/__pycache__
+paperreplications.egg-info
