@@ -9,6 +9,8 @@ I will keep this file updated on how many models implemented so far.
 I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat till model is implented -> Test Train`
 
 > TODO: I will be creating script files that will be accomodated in a final script so that the models can be accessed from a single file
+>
+> So a package will be created
 
 ## Activation Functions:
 
@@ -21,7 +23,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
   * [ ] Classifier free guidance
 * [X] [cGAN]
 * [ ] CLiP ViT  (We will implement the Vision Transformer before this as we will use the same vision transformer for CLiP)
-* [ ] [Vision Transfomer]
+* [X] [Vision Transfomer]
 
 ## Text Models and LLMs:
 

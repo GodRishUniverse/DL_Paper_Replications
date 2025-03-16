@@ -15,6 +15,7 @@ setup(
     version="0.1",
     packages=find_packages(),
     author="Rishabh Agarwal",
+    author_email="agarwalrishabh2005@gmail.com",
     install_requires=[
         "torch",
         "einops",

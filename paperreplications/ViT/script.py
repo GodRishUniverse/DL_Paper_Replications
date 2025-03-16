@@ -25,6 +25,7 @@ class ModelConfig:
     num_layers: int = 12
     device: str = 'cuda'
 
+    classify: bool = True
     class_dim: int = 768
     hid_class_dim: int = 3072
     # dropout: float = 0.1 - not used in this implementation
@@ -104,7 +105,11 @@ class ViT(nn.Module):
 
         self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, config.dim))
         self.transformer = Transformer(config=config)
-        self.mlp_head = MLP(config=config, out_dim=config.num_classes) # to fix
+
+
+        if config.classify:
+            self.mlp_head = MLP(config=config, out_dim=config.class_dim)
+        
     
     def forward(self, x):
         b, _, _, _ = x.shape
@@ -120,10 +125,14 @@ class ViT(nn.Module):
 
         z = z + self.pos_embedding
         z = self.transformer(z)
-        z = self.mlp_head(z)
+        print(z.shape, " After Transformer")
+        
+        if hasattr(self, 'mlp_head'):
+            z = self.mlp_head(z)
 
-        logits = z[:, 0, :] # Get the logits for the class token which is the first token
-        return z, logits
+            logits = z[:, 0, :] # Get the logits for the class token which is the first token
+            return z, logits
+        return z, None
 
 
 if __name__ == '__main__':
@@ -149,6 +158,7 @@ if __name__ == '__main__':
         hidden_dim = 768,
         patch_size = 8,
         num_classes = 100,
+        classify=True,
         device = device
     )
     vit = ViT(config=config)
