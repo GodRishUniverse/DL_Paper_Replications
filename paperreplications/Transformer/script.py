@@ -12,6 +12,26 @@ from torch.utils.data import Dataset, DataLoader
 import math
 
 
+# THERE IS A BUG IN THE CODE - 
+"""
+
+    tgt_embedded = self.tgt_embed(output_emb) * math.sqrt(self.d_model)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Rishabh\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\nn\modules\module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Rishabh\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\nn\modules\module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Rishabh\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\nn\modules\sparse.py", line 190, in forward
+    return F.embedding(
+           ^^^^^^^^^^^^
+  File "C:\Users\Rishabh\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\nn\functional.py", line 2551, in embedding
+    return torch.embedding(weight, input, padding_idx, scale_grad_by_freq, sparse)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Expected tensor for argument #1 'indices' to have one of the following scalar types: Long, Int; but got torch.cuda.FloatTensor instead (while checking arguments for embedding)
+"""
+
 @dataclass
 class ModelConfig:
     d_model: int = 512 
@@ -96,16 +116,14 @@ class Encoder(nn.Module):
     def __init__(self, config: ModelConfig):
         super().__init__()
 
-        num_heads = config.num_heads
         d_model = config.d_model
         dff = config.dff
-        dropout = config.dropout
         device = config.device
 
-        self.mha = MultiHeadAttention(num_heads, d_model, dropout, device=device)
+        self.mha = MultiHeadAttention(config=config)
         self.layernorm1 = nn.LayerNorm(d_model, device=device)
 
-        self.ffn = FFN(d_model=d_model, device=device, dff=dff)
+        self.ffn = FFN(config=config)
         self.layernorm2 = nn.LayerNorm(d_model, device =device)
 
         self.device = device
@@ -122,16 +140,14 @@ class Decoder(nn.Module):
     def __init__(self,config: ModelConfig):
         super().__init__()
 
-        num_heads = config.num_heads
         d_model = config.d_model
-        dff = config.dff
         dropout = config.dropout
         device = config.device
 
-        self.self_attn = MultiHeadAttention(num_heads, d_model, dropout, device=device)
-        self.cross_attn = MultiHeadAttention(num_heads, d_model,dropout, device=device)
+        self.self_attn = MultiHeadAttention(config=config)
+        self.cross_attn = MultiHeadAttention(config=config)
 
-        self.ffn = FFN(d_model =d_model, device=device, dff= dff)
+        self.ffn = FFN(config=config)
 
         self.layernorm1 = nn.LayerNorm(d_model, device=device)
         self.layernorm2 = nn.LayerNorm(d_model, device=device)
@@ -158,8 +174,6 @@ class Transformer(nn.Module):
     def __init__(self,  config: ModelConfig):
         super().__init__()
 
-        num_heads = config.num_heads
-        d_ff = config.dff
         num_encoder_layers = config.num_encoder_layers
         num_decoder_layers = config.num_decoder_layers
         dropout = config.dropout
@@ -168,22 +182,22 @@ class Transformer(nn.Module):
         max_seq_len = config.max_seq_len
         device = config.device
 
-        self.pad_index = config.pad_idx
+        self.pad_index = config.pad_index
         self.d_model = config.d_model
         self.device = device
 
 
         # Embeddings
-        self.src_embed = nn.Embedding(src_vocab_size, self.d_model, padding_idx=self.pad_index)
-        self.tgt_embed = nn.Embedding(tgt_vocab_size, self.d_model, padding_idx=self.pad_index)
+        self.src_embed = nn.Embedding(src_vocab_size, self.d_model, padding_idx=self.pad_index, device=self.device)
+        self.tgt_embed = nn.Embedding(tgt_vocab_size, self.d_model, padding_idx=self.pad_index, device=self.device)
 
         # Positional encoding
         self.pos_encoding = self.create_positional_encoding(max_seq_len, self.d_model)  # Max sequence length of 1000
         # rather than calculating this every forward pass we calculate this once and store it
 
         
-        self.encoder = nn.ModuleList([Encoder(num_heads=num_heads, d_model=self.d_model, dropout=dropout, device=device, dff=d_ff) for _ in range(num_encoder_layers)])
-        self.decoder = nn.ModuleList([Decoder(num_heads=num_heads, d_model=self.d_model,dropout= dropout, device=device, dff=d_ff) for _ in range(num_decoder_layers)])
+        self.encoder = nn.ModuleList([Encoder(config=config) for _ in range(num_encoder_layers)])
+        self.decoder = nn.ModuleList([Decoder(config=config) for _ in range(num_decoder_layers)])
         self.final = nn.Sequential(
             nn.Linear(self.d_model, tgt_vocab_size, device=device),
         )
@@ -222,6 +236,8 @@ class Transformer(nn.Module):
         
         # Embedding and positional encoding for source
         src_embedded = self.src_embed(input_emb) * math.sqrt(self.d_model)
+        src_embedded = src_embedded.to(self.device)
+
         src_embedded = src_embedded + self.pos_encoding[:, :src_embedded.size(1)].to(src_embedded.device)
         enc_output = self.dropout(src_embedded)
 

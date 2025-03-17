@@ -46,6 +46,10 @@ class ModelConfig:
     num_decoder_layers: int = 6 # num_decoder_layers
     max_seq_len: int =1000
 
+
+    # clip specific
+    d_e: int = 512
+
 class ClipViT(nn.Module):
     def __init__(self, config: ModelConfig):
         super().__init__()
@@ -82,21 +86,25 @@ class ClipViT(nn.Module):
         self.text_encoder = Transformer(config=transformer_configuration)
 
         # to fix as this learned projection is WRONG
-        self.W_i = nn.Parameter(torch.randn(config.dim, config.hid_class_dim)) # to see if this works
-        self.W_t = nn.Parameter(torch.randn(config.dim, config.class_dim)) # to see if this works
+        self.W_i = nn.Parameter(torch.randn(config.hid_class_dim, config.d_e)) # to see if this works
+        self.W_t = nn.Parameter(torch.randn(config.tgt_vocab_size, config.d_e)) # to see if this works
 
         self.temp = nn.Parameter(torch.tensor(0.1))
         
         self.device = config.device
         
     
-    def forward(self, I, T, n=None):
+    def forward(self, I, T, output_emb, n=None):
         I_f, _ = self.img_encoder(I)
-        T_f = self.text_encoder(T)
+        T_f = self.text_encoder(T, output_emb) # need to fix
+
+        print("I_f.shape", I_f.shape, "T_f.shape", T_f.shape)
 
         # joint multimodal embedding [n, d_e]
-        I_e = F.normalize(torch.dot(I_f, self.W_i), dim=1)
-        T_e = F.normalize(torch.dot(T_f, self.W_t), dim=1)
+        I_e = F.normalize(torch.dot(I_f, self.W_i.unsqueeze(0)), dim=1)
+        T_e = F.normalize(torch.dot(T_f, self.W_t.unsqueeze(0)), dim=1)
+
+        print("I_e.shape", I_e.shape, "T_e.shape", T_e.shape)
         # scaled pairwise cosine similarities [n, n]
         logits = torch.dot(I_e, T_e.T) * torch.exp(self.temp) 
 
@@ -112,3 +120,17 @@ class ClipViT(nn.Module):
 
         
         
+if __name__ == "__main__":
+    config = ModelConfig()
+    model = ClipViT(config)
+    print(model)
+
+    # sample data
+
+    I = torch.randn(2, 3, 224, 224).to(config.device)
+    T = torch.randint(0, 100, (2, 100)).to(config.device)
+    output_emb = torch.randn(100, 512).to(config.device)
+
+    logits, loss = model(I, T, output_emb)
+
+    print("logits.shape", logits.shape, "loss", loss)

@@ -97,13 +97,13 @@ class ViT(nn.Module):
         # patch embedding
         self.to_patch_embedding = nn.Sequential(
             Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = patch_size, p2 = patch_size),
-            nn.LayerNorm(patch_size * patch_size * config.num_channels),
-            nn.Linear(patch_size * patch_size * config.num_channels, config.dim),
-            nn.LayerNorm(config.dim)
+            nn.LayerNorm(patch_size * patch_size * config.num_channels, device = config.device),
+            nn.Linear(patch_size * patch_size * config.num_channels, config.dim, device = config.device),
+            nn.LayerNorm(config.dim, device = config.device)
         )
-        self.class_token = nn.Parameter(torch.randn(1, 1, config.dim))
+        self.class_token = nn.Parameter(torch.randn(1, 1, config.dim)).to(self.device)
 
-        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, config.dim))
+        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, config.dim)).to(self.device)
         self.transformer = Transformer(config=config)
 
 
@@ -116,9 +116,11 @@ class ViT(nn.Module):
     
         # Create patch embeddings
         x = self.to_patch_embedding(x)
+        x = x.to(self.device)
         
         # Expand class token to match batch size
         cls_tokens = self.class_token.expand(b, -1, -1)
+        cls_tokens = cls_tokens.to(self.device)
         
         # Concatenate class token with patch embeddings
         z = torch.cat((cls_tokens, x), dim=1)
