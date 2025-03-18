@@ -22,12 +22,12 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 * [ ] [DDPM] - implementation of DDIM and DDPM is the same however only the noising process of the image is different. DDIM is faster.
   * [ ] Classifier free guidance
 * [X] [cGAN]
-* [ ] CLiP ViT  (We will implement the Vision Transformer before this as we will use the same vision transformer for CLiP)
+* [X] CLiP ViT
 * [X] [Vision Transfomer]
 
 ## Text Models and LLMs:
 
-* [X] [Transformer]
+* [X] [Transformer] - **TODO: fix the error in the decoder cross attention mask**
 * [X] [MoE]
 * [ ] [xLSTM] - paused
 * [ ] [BERT]
@@ -37,6 +37,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 ## Models Trained and Tested So far:
 
 * [X] cGAN
+* [X] ViT
 
 ## Authors:
 

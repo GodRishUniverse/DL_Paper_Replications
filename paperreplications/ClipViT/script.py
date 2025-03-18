@@ -33,7 +33,6 @@ class ModelConfig:
     hid_class_dim: int = 3072
 
     # transformer specific
-    d_model: int = 512 
     dff: int = 2048
     num_heads: int = 8
     dropout: float = 0.1
@@ -48,7 +47,7 @@ class ModelConfig:
 
 
     # clip specific
-    d_e: int = 512
+    d_e: int = 512 # same as d_model in transformer
 
 class ClipViT(nn.Module):
     def __init__(self, config: ModelConfig):
@@ -70,7 +69,7 @@ class ClipViT(nn.Module):
         self.img_encoder = ViT(config=vit_configuration)
 
         transformer_configuration = transformer_config(
-            d_model=config.d_model,
+            d_model=config.d_e,
             dff=config.dff,
             num_heads=config.num_heads,
             dropout=config.dropout,
@@ -86,8 +85,8 @@ class ClipViT(nn.Module):
         self.text_encoder = Transformer(config=transformer_configuration)
 
         # to fix as this learned projection is WRONG
-        self.W_i = nn.Parameter(torch.randn(config.hid_class_dim, config.d_e)) # to see if this works
-        self.W_t = nn.Parameter(torch.randn(config.tgt_vocab_size, config.d_e)) # to see if this works
+        self.W_i = nn.Parameter(torch.randn(config.class_dim, config.d_e, device=config.device)) # to see if this works
+        self.W_t = nn.Parameter(torch.randn(config.d_e, config.d_e, device=config.device)) # to see if this works
 
         self.temp = nn.Parameter(torch.tensor(0.1))
         
@@ -95,18 +94,23 @@ class ClipViT(nn.Module):
         
     
     def forward(self, I, T, output_emb, n=None):
-        I_f, _ = self.img_encoder(I)
-        T_f = self.text_encoder(T, output_emb) # need to fix
 
-        print("I_f.shape", I_f.shape, "T_f.shape", T_f.shape)
+        
+        I_f, _ = self.img_encoder(I)
+        T_f = self.text_encoder(T, output_emb) # temporally fixed
+
+        I_e = I_f.mean(dim=1) 
+        I_e = torch.matmul(I_e, self.W_i)
+        I_e = F.normalize(I_e, dim=1)
+
+
+        T_e = T_f.mean(dim=2)
+        T_e = torch.matmul(T_e, self.W_t)
+        T_e = F.normalize(T_e, dim=1)  # [100, 512]
 
         # joint multimodal embedding [n, d_e]
-        I_e = F.normalize(torch.dot(I_f, self.W_i.unsqueeze(0)), dim=1)
-        T_e = F.normalize(torch.dot(T_f, self.W_t.unsqueeze(0)), dim=1)
-
-        print("I_e.shape", I_e.shape, "T_e.shape", T_e.shape)
-        # scaled pairwise cosine similarities [n, n]
-        logits = torch.dot(I_e, T_e.T) * torch.exp(self.temp) 
+        logits = torch.matmul(I_e, T_e.transpose(0, 1))
+        logits = logits * torch.exp(self.temp) 
 
         if n is not None:
             # symmetric loss function

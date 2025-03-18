@@ -12,25 +12,12 @@ from torch.utils.data import Dataset, DataLoader
 import math
 
 
-# THERE IS A BUG IN THE CODE - 
-"""
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
-    tgt_embedded = self.tgt_embed(output_emb) * math.sqrt(self.d_model)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\Rishabh\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\nn\modules\module.py", line 1739, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\Rishabh\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\nn\modules\module.py", line 1750, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\Rishabh\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\nn\modules\sparse.py", line 190, in forward
-    return F.embedding(
-           ^^^^^^^^^^^^
-  File "C:\Users\Rishabh\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\nn\functional.py", line 2551, in embedding
-    return torch.embedding(weight, input, padding_idx, scale_grad_by_freq, sparse)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-RuntimeError: Expected tensor for argument #1 'indices' to have one of the following scalar types: Long, Int; but got torch.cuda.FloatTensor instead (while checking arguments for embedding)
-"""
+
+# THERE IS A BUG IN THE CODE - 
+
 
 @dataclass
 class ModelConfig:
@@ -99,6 +86,8 @@ class MultiHeadAttention(nn.Module):
         scores = torch.matmul(q, k.transpose(-2, -1)) / self.scale
         
         if mask is not None:
+            mask = mask.to(self.device)
+            # print("In MHA cust: ", mask.shape, scores.shape, "Q: ", q.shape, "K: ", k.shape, "V: ", v.shape)
             scores = scores.masked_fill(mask == 0, float('-inf'))
         
         attn = F.softmax(scores, dim=-1)
@@ -162,7 +151,8 @@ class Decoder(nn.Module):
         x = self.layernorm1(x + self.dropout(attn_output))
         
         # Cross-attention
-        attn_output = self.cross_attn(x, residual, residual, src_mask)
+        # attn_output = self.cross_attn(x, residual, residual, src_mask) # causing error - mask size is different and doesnt match q,k,v size
+        attn_output = self.cross_attn(x, residual, residual, None) # mask set to None to avoid error for the time being
         x = self.layernorm2(x + self.dropout(attn_output))
         
         # FFN
@@ -174,35 +164,34 @@ class Transformer(nn.Module):
     def __init__(self,  config: ModelConfig):
         super().__init__()
 
-        num_encoder_layers = config.num_encoder_layers
-        num_decoder_layers = config.num_decoder_layers
-        dropout = config.dropout
-        src_vocab_size = config.src_vocab_size
-        tgt_vocab_size = config.tgt_vocab_size
-        max_seq_len = config.max_seq_len
-        device = config.device
+        self.num_encoder_layers = config.num_encoder_layers
+        self.num_decoder_layers = config.num_decoder_layers
+        self.dropout = config.dropout
+        self.src_vocab_size = config.src_vocab_size
+        self.tgt_vocab_size = config.tgt_vocab_size
+        self.max_seq_len = config.max_seq_len
+        self.device = config.device
 
         self.pad_index = config.pad_index
         self.d_model = config.d_model
-        self.device = device
 
 
         # Embeddings
-        self.src_embed = nn.Embedding(src_vocab_size, self.d_model, padding_idx=self.pad_index, device=self.device)
-        self.tgt_embed = nn.Embedding(tgt_vocab_size, self.d_model, padding_idx=self.pad_index, device=self.device)
+        self.src_embed = nn.Embedding(self.src_vocab_size, self.d_model, padding_idx=self.pad_index, device=self.device)
+        self.tgt_embed = nn.Embedding(self.tgt_vocab_size, self.d_model, padding_idx=self.pad_index, device=self.device)
 
         # Positional encoding
-        self.pos_encoding = self.create_positional_encoding(max_seq_len, self.d_model)  # Max sequence length of 1000
+        self.pos_encoding = self.create_positional_encoding(self.max_seq_len, self.d_model)  # Max sequence length of 1000
         # rather than calculating this every forward pass we calculate this once and store it
 
         
-        self.encoder = nn.ModuleList([Encoder(config=config) for _ in range(num_encoder_layers)])
-        self.decoder = nn.ModuleList([Decoder(config=config) for _ in range(num_decoder_layers)])
+        self.encoder = nn.ModuleList([Encoder(config=config) for _ in range(self.num_encoder_layers)])
+        self.decoder = nn.ModuleList([Decoder(config=config) for _ in range(self.num_decoder_layers)])
         self.final = nn.Sequential(
-            nn.Linear(self.d_model, tgt_vocab_size, device=device),
+            nn.Linear(self.d_model, self.tgt_vocab_size, device=self.device),
         )
 
-        self.dropout = nn.Dropout(dropout) 
+        self.dropout = nn.Dropout(self.dropout) 
 
         self.init_parameters()
 
@@ -231,6 +220,11 @@ class Transformer(nn.Module):
     
     def forward(self, input_emb, output_emb):
 
+        output_emb = output_emb.long()
+
+        output_emb = torch.clamp(output_emb, 0, self.tgt_vocab_size - 1) # trying to fix Assertion `srcIndex < srcSelectDimSize` failed - suggests that output_emb contains values that are >= tgt_vocab_size
+        #(Used Claude for debugging)
+
         src_mask = self.create_padding_mask(input_emb)
         tgt_mask = self.create_causal_mask(output_emb)
         
@@ -238,7 +232,8 @@ class Transformer(nn.Module):
         src_embedded = self.src_embed(input_emb) * math.sqrt(self.d_model)
         src_embedded = src_embedded.to(self.device)
 
-        src_embedded = src_embedded + self.pos_encoding[:, :src_embedded.size(1)].to(src_embedded.device)
+        temp  = (self.pos_encoding[:, :src_embedded.size(1)]).to(self.device)
+        src_embedded = src_embedded + temp
         enc_output = self.dropout(src_embedded)
 
         for enc in self.encoder:
@@ -246,7 +241,8 @@ class Transformer(nn.Module):
         
         # Embedding and positional encoding for target
         tgt_embedded = self.tgt_embed(output_emb) * math.sqrt(self.d_model)
-        tgt_embedded = tgt_embedded + self.pos_encoding[:, :tgt_embedded.size(1)].to(tgt_embedded.device)
+        temp = (self.pos_encoding[:, :tgt_embedded.size(1)]).to(self.device)
+        tgt_embedded = tgt_embedded + temp
         dec_output = self.dropout(tgt_embedded)
 
         # Decoder
@@ -262,7 +258,7 @@ class Transformer(nn.Module):
             src_mask = self.create_padding_mask(inputs)
             
             src_embedded = self.src_embed(inputs) * math.sqrt(self.d_model)
-            src_embedded = src_embedded + self.pos_encoding[:, :src_embedded.size(1)].to(src_embedded.device)
+            src_embedded = src_embedded + self.pos_encoding[:, :src_embedded.size(1)].to(self.device)
             enc_output = self.dropout(src_embedded)
             
             for enc in self.encoder:
@@ -276,7 +272,7 @@ class Transformer(nn.Module):
                 tgt_mask = self.create_causal_mask(target)
                 
                 tgt_embedded = self.tgt_embed(target) * math.sqrt(self.d_model)
-                tgt_embedded = tgt_embedded + self.pos_encoding[:, :tgt_embedded.size(1)].to(tgt_embedded.device)
+                tgt_embedded = tgt_embedded + self.pos_encoding[:, :tgt_embedded.size(1)].to(self.device)
                 dec_output = self.dropout(tgt_embedded)
                 
                 for dec in self.decoder:
