@@ -70,7 +70,7 @@ class Gating(nn.Module):
         noise = self.softplus(noise)
 
         # comput H(x)
-        h_x = prelim + standard_normal + noise
+        h_x = prelim + standard_normal * noise
         return self.softmax(self.keepTopK(h_x, k))
 
 

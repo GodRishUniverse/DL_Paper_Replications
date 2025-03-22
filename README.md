@@ -29,7 +29,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 
 * [X] [Transformer] - **TODO: fix the error in the decoder cross attention mask**
 * [X] [MoE]
-* [ ] [xLSTM] - paused
+* [ ] [xLSTM] - **paused**
 * [ ] [BERT]
 * [ ] [GPT-2]
 * [ ] [Llama2]
