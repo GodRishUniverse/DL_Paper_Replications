@@ -15,7 +15,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 ## Activation Functions:
 
 * [X] Maxout
-* [X] RMSNorm - need to be tested
+* [X] RMSNorm (Jax implementation as well)
 
 ## Vision Models:
 
@@ -28,11 +28,10 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 ## Text Models and LLMs:
 
 * [X] [Transformer] - **TODO: fix the error in the decoder cross attention mask**
-* [X] [MoE]
+* [X] [Sparsely Gated MoE]
 * [ ] [xLSTM] - **paused**
-* [ ] [BERT]
-* [ ] [GPT-2]
 * [ ] [Llama2]
+* [ ] [Mamba] - State Space Model - **TODO**
 
 ## Models Trained and Tested So far:
 
