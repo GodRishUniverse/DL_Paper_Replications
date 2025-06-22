@@ -4,13 +4,21 @@ import torch.nn as nn
 from typing import List, Tuple, Dict, Optional, Union
 from dataclasses import dataclass
 
-class RoPE(nn.Module):
-    def __init__(self, d_model ,base = 10000):
-        super().__init__()
-        assert d_model % 2 ==0 
-        self.d = d_model
+@dataclass
+class RoPEConfig:
+    d_model: int
+    base: int = 10000
+    device: str = "cuda"
 
-        inverse = 1/base**(2*(torch.arange(0, d_model, 2))/d_model)
+class RoPE(nn.Module):
+    def __init__(self, args: RoPEConfig):
+        super().__init__()
+        assert args.d_model % 2 ==0 
+        self.d = args.d_model
+        self.device = args.device
+
+        inverse = 1/args.base**(2*(torch.arange(0, args.d_model, 2))/args.d_model)
+    
         self.register_buffer('inverse', inverse) # these are not trainable  - used for training and register_buffer saves the tensor to the model's state dictionary as well
         # self.register_buffer -  Stores inverse as a non-trainable parameter that moves with the model (GPU/CPU) and gets saved/loaded with model state.
 
@@ -36,7 +44,7 @@ class RoPE(nn.Module):
         result = torch.stack([rotated_even, rotated_odd], dim=-1)
         result = result.flatten(-2)
 
-        return result
+        return result.to(self.device)
 
         # Below implemenatation is mathematically sound but practically inefficient
 
@@ -52,6 +60,7 @@ class RoPE(nn.Module):
 
 
 if __name__ == "__main__":
-    rope = RoPE(10)
-
+    # TODO: test this out
+    rope_config = RoPEConfig(10)
+    rope = RoPE(rope_config)
 
