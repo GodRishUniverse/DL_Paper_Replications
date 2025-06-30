@@ -12,10 +12,11 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 >
 > So a package will be created
 
-## Activation Functions:
+## Activation Functions and Embedding:
 
 * [X] Maxout
 * [X] RMSNorm (Jax implementation as well)
+* [X] RoPE
 
 ## Vision Models:
 
@@ -29,9 +30,9 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 
 * [X] [Transformer] - **TODO: fix the error in the decoder cross attention mask**
 * [X] [Sparsely Gated MoE]
-* [ ] [xLSTM] - **paused**
-* [ ] [Llama2]
-* [ ] [Mamba] - State Space Model - **TODO**
+* [ ] [xLSTM]
+* [ ] [Mamba] - State Space Model
+* [ ] [Titans]
 
 ## Models Trained and Tested So far:
 
