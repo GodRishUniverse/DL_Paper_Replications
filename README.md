@@ -41,6 +41,14 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 * [X] cGAN
 * [X] ViT
 
+##  How to use?
+
+Let us give a code snippet that is follows the same structure to be used for deployments
+```python
+import paperreplications
+
+```
+
 ## Authors:
 
 - [@GodRishUniverse](https://github.com/GodRishUniverse)
