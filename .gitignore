@@ -37,4 +37,7 @@ wheels/
 .installed.cfg
 *.egg
 
+.ropeproject
 
+#ignore xopp notes and files
+paperreplications/*/*.xopp

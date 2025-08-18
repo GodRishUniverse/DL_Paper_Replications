@@ -23,8 +23,9 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 * [ ] [DDPM] - implementation of DDIM and DDPM is the same however only the noising process of the image is different. DDIM is faster.
   * [ ] Classifier free guidance
 * [X] [cGAN]
-* [X] CLiP ViT
+* [X] [CLiP ViT]
 * [X] [Vision Transfomer]
+
 
 ## Text Models and LLMs:
 
@@ -33,7 +34,8 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 * [ ] [xLSTM]
 * [ ] [Mamba] - State Space Model
 * [ ] [Titans]
-
+* [ ] [DeepSeek V3]
+* [ ] [Llama 3]
 ## Models Trained and Tested So far:
 
 * [X] cGAN
