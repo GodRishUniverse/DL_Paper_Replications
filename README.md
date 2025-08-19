@@ -1,6 +1,6 @@
 # Deep Learning Model Paper-Replications
 
-> 📝  **For Educational Purposes only**
+>  **For Educational Purposes only**
 
 In this repository I will be replicating ML/DL/AI Papers and Model Architecture from Scratch using PyTorch (I may use Jax sometimes)
 
@@ -36,6 +36,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 * [ ] [Titans]
 * [ ] [DeepSeek V3]
 * [ ] [Llama 3]
+
 ## Models Trained and Tested So far:
 
 * [X] cGAN
@@ -43,9 +44,12 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 
 ##  How to use?
 
-Let us give a code snippet that is follows the same structure to be used for deployments
+Let us give a code snippet that follows the same structure for each model implemented:
+
+
 ```python
 import paperreplications
+
 
 ```
 
