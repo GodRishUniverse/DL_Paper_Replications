@@ -13,9 +13,23 @@ import torch.nn.functional as F
 
 @dataclass
 class NeuralMemoryConfig:
-    # TODO: implement
-    ...
+    d_in: int
+    mem_type :str = "linear"
+    depth: Optional[int] =2
+    expansion_factor: Optional[int] = 2
 
+    lr: Optional[float] = None
+    alpha: Optional[float] = None
+    decay: Optional[float] = None
+
+    seq_len: Optional[int] = None
+    chunk_size: Optional[int] = None
+
+    learn_hyper_params: Optional[bool] = False
+
+
+def xnor(a: bool, b: bool) -> bool:
+    return not(a ^ b)
 
 
 # Google Titans is a test time framework
@@ -89,66 +103,60 @@ class LinearMLPMemory(MemoryModuleLayer):
 class NeuralMemory(nn.Module):
 
     def __init__(self,
-        d_in: int,
-        mem_type :str = "linear",
-        depth: Optional[int] =2,
-        expansion_factor: Optional[int] = 2,
+        # d_in: int,
+        # mem_type :str = "linear",
+        # depth: Optional[int] =2,
+        # expansion_factor: Optional[int] = 2,
 
-        lr: Optional[float] = None,
-        alpha: Optional[float] = None,
-        decay: Optional[float] = None,
+        # lr: Optional[float] = None,
+        # alpha: Optional[float] = None,
+        # decay: Optional[float] = None,
 
-        seq_len: Optional[int] = None,
-        chunk_size: Optional[int] = None,
-        parallelize: Optional[bool] = False, # we want to preserve the recurrent nature of the store mechanism
+        # seq_len: Optional[int] = None,
+        # chunk_size: Optional[int] = None,
+        # parallelize: Optional[bool] = False, # we want to preserve the recurrent nature of the store mechanism
 
-        learn_hyper_params: Optional[bool] = False,
-
+        # learn_hyper_params: Optional[bool] = False,
+        config: NeuralMemoryConfig
     ):
 
         super().__init__()
 
-        self.learnhparams = learn_hyper_params
+        self.learnhparams = config.learn_hyper_params
         self.eps = 1e-6
 
-        self.parallelize= parallelize
-
         # we want both self.seq_len and self.chunk_size to be defined
-        assert self._xnor(seq_len is None, chunk_size is None) is True, "We want both to be defined or neither"
+        assert xnor(config.seq_len is None, config.chunk_size is None) is True, "We want both to be defined or neither"
 
-        if seq_len is not None and chunk_size is not None:
-            assert seq_len % chunk_size ==0, "We want the seq length to be divisible by chunk size"
+        if config.seq_len is not None and config.chunk_size is not None:
+            assert config.seq_len % config.chunk_size ==0, "We want the seq length to be divisible by chunk size"
             # can be fixed if we use remainders and padding [we will technically be using broadcasting in that case to fix it]
-            self.seq_len = seq_len
-            self.chunk_size = chunk_size
-            self.num_chunks = seq_len // chunk_size
+            self.seq_len = config.seq_len
+            self.chunk_size = config.chunk_size
+            self.num_chunks = config.seq_len // config.chunk_size
 
 
-        if mem_type== 'linear':
-            self.memory= LinearMLPMemory(dim_in=d_in, depth=depth if depth is not None else 2, factor= expansion_factor if expansion_factor is not None else 2) # this memort is our M_t (from paper)
-        elif mem_type == "...": #TODO: to implement
+        if config.mem_type== 'linear':
+            self.memory= LinearMLPMemory(dim_in=config.d_in, depth=config.depth if config.depth is not None else 2, factor= config.expansion_factor if config.expansion_factor is not None else 2) # this memort is our M_t (from paper)
+        elif config.mem_type == "...": #TODO: to implement
             ... # to implement other kinds of memory types
             raise Exception("To implement other memory modules")
         else:
-            self.memory= LinearMLPMemory(dim_in=d_in, depth=depth if depth is not None else 2, factor= expansion_factor if expansion_factor is not None else 2) # this memort is our M_t (from paper)
+            self.memory= LinearMLPMemory(dim_in=config.d_in, depth=config.depth if config.depth is not None else 2, factor= config.expansion_factor if config.expansion_factor is not None else 2) # this memort is our M_t (from paper)
 
 
-        self.w_k = nn.Parameter(torch.randn(d_in, d_in)) # projection for keys
-        self.w_v = nn.Parameter(torch.randn(d_in, d_in)) # projection for values
-        self.w_q = nn.Parameter(torch.randn(d_in, d_in)) # projection for queries - for retrieval
+        self.w_k = nn.Parameter(torch.randn(config.d_in, config.d_in)) # projection for keys
+        self.w_v = nn.Parameter(torch.randn(config.d_in, config.d_in)) # projection for values
+        self.w_q = nn.Parameter(torch.randn(config.d_in, config.d_in)) # projection for queries - for retrieval
 
         for w in [self.w_q, self.w_k, self.w_v]:
             nn.init.xavier_uniform_(w)
 
-        self.alpha_t = self._make_param(alpha) # forget mechanism [0,1] <- range for alpha
-        self.lr = self._make_param(lr) # step size - learning rate [0,1] <- range for lr
-        self.decay = self._make_param(decay) # to get the previous surprise <- [0,1] range for decay factor
+        self.alpha_t = self._make_param(config.alpha) # forget mechanism [0,1] <- range for alpha
+        self.lr = self._make_param(config.lr) # step size - learning rate [0,1] <- range for lr
+        self.decay = self._make_param(config.decay) # to get the previous surprise <- [0,1] range for decay factor
 
         self.surprise = [torch.zeros_like(param) for param in self.memory.get_parameter_weights()]
-
-
-    def _xnor(self, a: bool, b: bool) -> bool:
-        return not(a ^ b)
 
     def _make_param(self, init_val ) -> nn.Parameter | torch.Tensor:
         # FIXED below
@@ -177,6 +185,10 @@ class NeuralMemory(nn.Module):
     def _lr(self):
         return torch.sigmoid(self.lr)
 
+    def _reset_memory_state(self):
+        for surprise_tensor in self.surprise:
+            surprise_tensor.zero_()
+
     # Inner-loop
     def store(self, x):
         # we project to get our k_t and q_t values
@@ -192,7 +204,8 @@ class NeuralMemory(nn.Module):
         # we do not use torch.no_grad here as then that wouldn't allow the gradients of the Params to be passed through and optimized
         for i, (w,g) in enumerate(zip(weights, grads)):
             self.surprise[i] = self._decay * self.surprise[i] - self._lr * g # S_t = eta*S_{t-1} -theta_t*gradient_of_loss
-            w.data = (1 -self._alpha) * w.data + self.surprise[i] # M_t = (1-alpha)*M_{t-1} + S_t
+            updated_weight = (1 -self._alpha) * w + self.surprise[i] # M_t = (1-alpha)*M_{t-1} + S_t
+            w.data.copy_(updated_weight.data)
             # NOT SURE ABOUT THIS need to check if this is inplace or not - cause we do not want inplace as that destroys gradients
 
     # we will not be updating anything here
@@ -200,22 +213,79 @@ class NeuralMemory(nn.Module):
         q = x @ self.w_q # project to space for retrieval
         return self.memory(q)
 
-    def forward(self,x, update_mem: bool = False) -> torch.Tensor :
-       if update_mem:
+    def forward(self,x, update: bool = False, reset_surp: bool =False) -> torch.Tensor :
+        if reset_surp:
+            self._reset_memory_state()
+
+        if update:
            if self.chunk_size is not None and self.seq_len is not None and self.chunk_size < x.shape[1]: # x shape is [batch, seq_len, data]
                 assert x.shape[1] == self.seq_len, "Passed sequence length and actual sequence length need to match"
-                if not self.parallelize: # DEFAULT BEHAVIOUR
-                    # SEQUENTIAL
-                    for chunk in torch.split(x, self.chunk_size, dim=1):
-                        self.store(chunk)
-                else:
-                    # DO WE WANT TO PARALLELIZE this? BREAKS the recurrent nature as chunk2 has no info about chunk1
-                    # PARALLEL- IMPLEMENTATION EXISTS BUT NOT RECOMMENDED
-                    # seq_len should be divisible by chunk_size
-                    x_parallel = rearrange(x, "b (n c) d -> (b n) c d", n= self.num_chunks, c= self.chunk_size)
-                    self.store(x_parallel)
+                # SEQUENTIAL
+                for chunk in torch.split(x, self.chunk_size, dim=1):
+                    self.store(chunk)
+                #     # DO WE WANT TO PARALLELIZE this? BREAKS the recurrent nature as chunk2 has no info about chunk1
+                #     # PARALLEL- IMPLEMENTATION EXISTS BUT NOT RECOMMENDED
+                #     # seq_len should be divisible by chunk_size
+                #     x_parallel = rearrange(x, "b (n c) d -> (b n) c d", n= self.num_chunks, c= self.chunk_size)
+                #     self.store(x_parallel)
            else:
                 self.store(x)
-       return self.retrieve(x)
+        return self.retrieve(x)
 
-# Basically we will also be implementing the MAC (Memory as context), MAL (Memory as Layer), MAG (Memory as Gate) architectures
+
+# MAC (Memory as context) Architecture
+class MemoryAsContext(nn.Module):
+    def __init__(self,
+        neural_mem_config: NeuralMemoryConfig,
+        persistent_mem_dim: int,
+        num_heads: int = 4,
+    ):
+        super().__init__()
+        self.neural_memory = NeuralMemory(config = neural_mem_config)
+        if neural_mem_config.seq_len is not None and neural_mem_config.chunk_size is not None:
+            self.chunk_size= neural_mem_config.chunk_size
+            self.segments = neural_mem_config.seq_len // neural_mem_config.chunk_size
+            self.expected_seq_len = neural_mem_config.seq_len
+        else:
+            raise Exception("We want the seq_len and chunk_size specified")
+
+        self.persistent_memory = nn.Parameter(torch.empty(1, persistent_mem_dim, requires_grad=True))
+        nn.init.xavier_normal_(self.persistent_memory)
+
+        embed_dim= 2*neural_mem_config.d_in + persistent_mem_dim
+        self.attn = nn.MultiheadAttention(embed_dim =embed_dim , num_heads = num_heads,  batch_first=True)
+        self.proj = nn.Linear(embed_dim, neural_mem_config.d_in)
+
+    def forward(self, x: torch.Tensor)-> torch.Tensor:
+        batch_size, seq_len, _ = x.shape
+
+        if hasattr(self, 'expected_seq_len') and seq_len != self.expected_seq_len:
+            raise ValueError(f"Expected sequence length {self.expected_seq_len}, got {seq_len}")
+
+        h_t = self.neural_memory(x, update = False)
+        persistent_expanded = self.persistent_memory.unsqueeze(0).expand(batch_size, seq_len, -1)
+        token = torch.cat([persistent_expanded ,h_t, x], dim=2)
+
+        y_t, _ = self.attn(token, token, token) # self-attention
+        projection_y_t =self.proj(y_t) # get it to the dimension that we can pass in our neural model
+        self.neural_memory(projection_y_t, update=True) # M_t = M_{t-1}(y_t)
+        o_t = projection_y_t * self.neural_memory(projection_y_t, update =False)
+        return o_t
+
+# MAL (Memory as Layer) Architecture
+class MemoryAsLayer(nn.Module):
+    def __init__(self,
+        neural_mem_config: NeuralMemoryConfig
+    ):
+        ...
+    def forward(self, ):
+        ...
+
+# MAG (Memory as Gate) architecture
+class MemoryAsGate(nn.Module):
+    def __init__(self,
+        neural_mem_config: NeuralMemoryConfig
+    ):
+        ...
+    def forward(self, ):
+        ...
