@@ -7,6 +7,8 @@ from typing import List, Optional, Tuple, Dict, Union
 
 from dataclasses import dataclass
 
+from einops import rearrange
+
 import torch.nn.functional as F
 
 @dataclass
@@ -47,9 +49,6 @@ class MemoryModuleLayer(ABC, nn.Module):
     def get_parameter_weights(self, )-> List[nn.Parameter]:
         ...
 
-    def __call__(self, *args, **kwargs):
-        return self.forward(*args, **kwargs)
-
 
 #TODO: NEED to check if the expansion and contraction work or not
 class LinearMLPMemory(MemoryModuleLayer):
@@ -87,8 +86,8 @@ class LinearMLPMemory(MemoryModuleLayer):
             x = x @ weight
         return x
 
-# TODO: update for chunking
 class NeuralMemory(nn.Module):
+
     def __init__(self,
         d_in: int,
         mem_type :str = "linear",
@@ -99,13 +98,31 @@ class NeuralMemory(nn.Module):
         alpha: Optional[float] = None,
         decay: Optional[float] = None,
 
-        learn_hyper_params: Optional[bool] = True
+        seq_len: Optional[int] = None,
+        chunk_size: Optional[int] = None,
+        parallelize: Optional[bool] = False, # we want to preserve the recurrent nature of the store mechanism
+
+        learn_hyper_params: Optional[bool] = False,
+
     ):
 
         super().__init__()
 
         self.learnhparams = learn_hyper_params
         self.eps = 1e-6
+
+        self.parallelize= parallelize
+
+        # we want both self.seq_len and self.chunk_size to be defined
+        assert self._xnor(seq_len is None, chunk_size is None) is True, "We want both to be defined or neither"
+
+        if seq_len is not None and chunk_size is not None:
+            assert seq_len % chunk_size ==0, "We want the seq length to be divisible by chunk size"
+            # can be fixed if we use remainders and padding [we will technically be using broadcasting in that case to fix it]
+            self.seq_len = seq_len
+            self.chunk_size = chunk_size
+            self.num_chunks = seq_len // chunk_size
+
 
         if mem_type== 'linear':
             self.memory= LinearMLPMemory(dim_in=d_in, depth=depth if depth is not None else 2, factor= expansion_factor if expansion_factor is not None else 2) # this memort is our M_t (from paper)
@@ -123,23 +140,42 @@ class NeuralMemory(nn.Module):
         for w in [self.w_q, self.w_k, self.w_v]:
             nn.init.xavier_uniform_(w)
 
-        self.alpha_t = self._make_param(alpha, self.eps, 1.0-self.eps) # forget mechanism [0,1] <- range for alpha
-        self.lr = self._make_param(lr, self.eps, 1.0-self.eps) # step size - learning rate [0,1] <- range for lr
-        self.decay = self._make_param(decay, self.eps, 1.0-self.eps) # to get the previous surprise <- [0,1] range for decay factor
+        self.alpha_t = self._make_param(alpha) # forget mechanism [0,1] <- range for alpha
+        self.lr = self._make_param(lr) # step size - learning rate [0,1] <- range for lr
+        self.decay = self._make_param(decay) # to get the previous surprise <- [0,1] range for decay factor
 
         self.surprise = [torch.zeros_like(param) for param in self.memory.get_parameter_weights()]
 
-    def _make_param(self, init_val,  min, max ) -> nn.Parameter | torch.Tensor:
+
+    def _xnor(self, a: bool, b: bool) -> bool:
+        return not(a ^ b)
+
+    def _make_param(self, init_val ) -> nn.Parameter | torch.Tensor:
+        # FIXED below
+        # ~~PROBLEM here - we do not want to use clamping rather should use the unconstrained space like sigmoid or softplus space as that is where the optimizer will live~~
+        # ~~The constrained space is where the problem that we have actually lives- that is clamping the values in the range -> [0,1]~~
         if init_val is not None:
-               tensor = torch.tensor(float(init_val))
+            clamped_val = max(min(init_val, 1.0 - self.eps), self.eps)
+            unconstrained = torch.log(torch.tensor(clamped_val / (1 - clamped_val))) # inverse of sigmoid
         else:
-            tensor = torch.rand(1) * (max - min) + min # clamping
+            unconstrained = torch.rand(1)
 
         if self.learnhparams:
-            param = nn.Parameter(tensor)
-            param.register_hook(lambda grad: torch.clamp(param.data, min, max)) # hook the gradient on the parameter
+            param = nn.Parameter(unconstrained)
             return param
-        return tensor
+        return unconstrained
+
+    @property
+    def _alpha(self):
+        return torch.sigmoid(self.alpha_t)
+
+    @property
+    def _decay(self):
+        return torch.sigmoid(self.decay)
+
+    @property
+    def _lr(self):
+        return torch.sigmoid(self.lr)
 
     # Inner-loop
     def store(self, x):
@@ -150,11 +186,14 @@ class NeuralMemory(nn.Module):
         loss = F.mse_loss(self.memory(k_t), v_t) # L2 Loss -> MSE [MAE is L1 Loss - paper uses loss = ||M_t(k_t) -v_t ||^2_2 - so the base 2 represents l2 loss]
         weights = self.memory.get_parameter_weights()
 
-        grads = torch.autograd.grad(loss, weights, create_graph=True, retain_graph=True) # returns tuple of tensor and other values
+        # ensures optimizer has smoother space to work with - but this converts back to actual values
+
+        grads = torch.autograd.grad(loss, weights, create_graph=True) # returns tuple of tensor and other values
         # we do not use torch.no_grad here as then that wouldn't allow the gradients of the Params to be passed through and optimized
         for i, (w,g) in enumerate(zip(weights, grads)):
-            self.surprise[i] = self.decay * self.surprise[i] - self.lr * g # S_t = eta*S_{t-1} -theta_t*gradient_of_loss
-            w.data.mul_(1 - self.alpha_t).add_(self.surprise[i]) # M_t = (1-alpha)*M_{t-1} + S_t
+            self.surprise[i] = self._decay * self.surprise[i] - self._lr * g # S_t = eta*S_{t-1} -theta_t*gradient_of_loss
+            w.data = (1 -self._alpha) * w.data + self.surprise[i] # M_t = (1-alpha)*M_{t-1} + S_t
+            # NOT SURE ABOUT THIS need to check if this is inplace or not - cause we do not want inplace as that destroys gradients
 
     # we will not be updating anything here
     def retrieve(self, x)-> torch.Tensor:
@@ -163,12 +202,20 @@ class NeuralMemory(nn.Module):
 
     def forward(self,x, update_mem: bool = False) -> torch.Tensor :
        if update_mem:
-           self.store(x)
+           if self.chunk_size is not None and self.seq_len is not None and self.chunk_size < x.shape[1]: # x shape is [batch, seq_len, data]
+                assert x.shape[1] == self.seq_len, "Passed sequence length and actual sequence length need to match"
+                if not self.parallelize: # DEFAULT BEHAVIOUR
+                    # SEQUENTIAL
+                    for chunk in torch.split(x, self.chunk_size, dim=1):
+                        self.store(chunk)
+                else:
+                    # DO WE WANT TO PARALLELIZE this? BREAKS the recurrent nature as chunk2 has no info about chunk1
+                    # PARALLEL- IMPLEMENTATION EXISTS BUT NOT RECOMMENDED
+                    # seq_len should be divisible by chunk_size
+                    x_parallel = rearrange(x, "b (n c) d -> (b n) c d", n= self.num_chunks, c= self.chunk_size)
+                    self.store(x_parallel)
+           else:
+                self.store(x)
        return self.retrieve(x)
 
 # Basically we will also be implementing the MAC (Memory as context), MAL (Memory as Layer), MAG (Memory as Gate) architectures
-
-
-if __name__ == '__main__':
-    print()
-    ...
