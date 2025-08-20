@@ -6,11 +6,12 @@ In this repository I will be replicating ML/DL/AI Papers and Model Architecture 
 
 I will keep this file updated on how many models implemented so far.
 
-I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat till model is implented -> Test Train`
+I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat till model is implented -> Write Notes on understanding on why the block works and the intuition and maths behind it -> Test Train`
 
 > TODO: I will be creating script files that will be accomodated in a final script so that the models can be accessed from a single file
 >
-> So a package will be created
+> ~~So a package will be created~~
+> COntemplating if I want to create a package or restructure this repo a bit
 
 ## Activation Functions and Embedding:
 
