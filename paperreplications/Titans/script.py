@@ -56,7 +56,7 @@ class MemoryModuleLayer(ABC, nn.Module):
         ...
 
     @abstractmethod
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, weights: Optional[List[torch.Tensor]]) -> torch.Tensor:
         ...
 
     @abstractmethod
@@ -93,8 +93,9 @@ class LinearMLPMemory(MemoryModuleLayer):
     def get_parameter_weights(self, )-> List[nn.Parameter]:
         return list(self.weights)
 
-    def forward(self, x: torch.Tensor):
-        for i,weight in enumerate(self.weights):
+    def forward(self, x: torch.Tensor, weights: Optional[List[torch.Tensor]] = None):
+        w_S = self.weights if weights is None else weights
+        for i,weight in enumerate(w_S):
             if i != 0:
                 x = F.gelu(x)         # we will be using the gelu activation
             x = x @ weight
@@ -157,6 +158,7 @@ class NeuralMemory(nn.Module):
         self.decay = self._make_param(config.decay) # to get the previous surprise <- [0,1] range for decay factor
 
         self.surprise = [torch.zeros_like(param) for param in self.memory.get_parameter_weights()]
+        self.fast_weights = [param.clone() for param in self.memory.get_parameter_weights()]
 
     def _make_param(self, init_val ) -> nn.Parameter | torch.Tensor:
         # FIXED below
@@ -186,6 +188,7 @@ class NeuralMemory(nn.Module):
         return torch.sigmoid(self.lr)
 
     def _reset_memory_state(self):
+        self.fast_weights = None
         for surprise_tensor in self.surprise:
             surprise_tensor.zero_()
 
@@ -202,16 +205,21 @@ class NeuralMemory(nn.Module):
 
         grads = torch.autograd.grad(loss, weights, create_graph=True) # returns tuple of tensor and other values
         # we do not use torch.no_grad here as then that wouldn't allow the gradients of the Params to be passed through and optimized
-        for i, (w,g) in enumerate(zip(weights, grads)):
-            self.surprise[i] = self._decay * self.surprise[i] - self._lr * g # S_t = eta*S_{t-1} -theta_t*gradient_of_loss
-            updated_weight = (1 -self._alpha) * w + self.surprise[i] # M_t = (1-alpha)*M_{t-1} + S_t
-            w.data.copy_(updated_weight.data)
+        new_surprise = []
+        new_fast_weights = []
+        for i, (w,g, s) in enumerate(zip(weights, grads,self.surprise)):
+            s_t = self._decay * s.detach() - self._lr * g # S_t = eta*S_{t-1} -theta_t*gradient_of_loss
+            new_surprise.append(s_t)
+            w_t = (1 -self._alpha) * w + s_t # M_t = (1-alpha)*M_{t-1} + S_t
+            new_fast_weights.append(w_t)
             # NOT SURE ABOUT THIS need to check if this is inplace or not - cause we do not want inplace as that destroys gradients
+        self.surprise = new_surprise
+        self.fast_weights = new_fast_weights
 
     # we will not be updating anything here
     def retrieve(self, x)-> torch.Tensor:
         q = x @ self.w_q # project to space for retrieval
-        return self.memory(q)
+        return self.memory(q, weights = self.fast_weights)
 
     def forward(self,x, update: bool = False, reset_surp: bool =False) -> torch.Tensor :
         if reset_surp:
