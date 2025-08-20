@@ -280,7 +280,7 @@ class MemoryAsContext(nn.Module):
         o_t = projection_y_t * self.neural_memory(projection_y_t, update =False)
         return o_t
 
-# MAL (Memory as Layer) Architecture
+# MAL (Memory as Layer) Architecture - Requires sliding window attention
 class MemoryAsLayer(nn.Module):
     def __init__(self,
         neural_mem_config: NeuralMemoryConfig
@@ -289,7 +289,7 @@ class MemoryAsLayer(nn.Module):
     def forward(self, ):
         ...
 
-# MAG (Memory as Gate) architecture
+# MAG (Memory as Gate) architecture - Requires sliding window attention
 class MemoryAsGate(nn.Module):
     def __init__(self,
         neural_mem_config: NeuralMemoryConfig

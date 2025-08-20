@@ -33,7 +33,7 @@ I will be following a simple pipeline - `Implement Block -> Test Block -> Repeat
 * [X] [Sparsely Gated MoE]
 * [ ] [xLSTM]
 * [ ] [Mamba] - State Space Model
-* [ ] [Titans]
+* [X] [Titans: Memory as Context Implemented, MAL and MAG require SlidingWindow attention and so have been left]
 * [ ] [DeepSeek V3]
 * [ ] [Llama 3]
 
